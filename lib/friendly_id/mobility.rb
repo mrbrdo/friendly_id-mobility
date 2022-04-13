@@ -75,7 +75,9 @@ module FriendlyId
       include ::FriendlyId::History::FinderMethods
 
       def exists_by_friendly_id?(id)
-        where(friendly_id_config.query_field => id).exists? ||
+        # Need to unscope the INNER JOIN friendly_id_slugs, because the INNER JOIN
+        # would incorrectly filter results
+        unscope(:joins).where(friendly_id_config.query_field => id).exists? ||
           joins(:slugs).where(slug_history_clause(id)).exists?
       end
     end
