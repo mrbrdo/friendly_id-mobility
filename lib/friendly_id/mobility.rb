@@ -45,18 +45,29 @@ module FriendlyId
       end
     end
 
+    def mobility_table_backend_translations
+      return [] unless self.class.mobility_attributes.include?(friendly_id_config.slug_column)
+      return [] unless mobility_backends[friendly_id_config.slug_column].kind_of?(::Mobility::Backends::ActiveRecord::Table)
+      send(mobility_backends[friendly_id_config.slug_column].association_name)
+    end
+
     def should_generate_new_friendly_id?
-      send(friendly_id_config.slug_column, locale: ::Mobility.locale).nil?
+      send(friendly_id_config.slug_column, locale: ::Mobility.locale).nil? && !send(friendly_id_config.base).nil?
     end
 
     def set_slug(normalized_slug = nil)
-      super
-      changed.each do |change|
-        if change =~ /\A(?:#{friendly_id_config.base}|#{friendly_id_config.slug_column})_([a-z]{2}(_[a-z]{2})?)\Z/
-          locale, suffix = $1.split('_'.freeze)
-          locale = "#{locale}-#{suffix.upcase}".freeze if suffix
-          ::Mobility.with_locale(locale) { super }
+      m_translations = mobility_table_backend_translations.to_a
+      if m_translations.any?
+        m_translations.each do |translation|
+          ::Mobility.with_locale(translation.locale) do
+            super
+            # I would expect this to happen automatically by Mobility, but it doesn't
+            # We don't use locale: ::Mobility.locale intentionally, so fallbacks can be applied if it's blank
+            translation[friendly_id_config.slug_column] = send(friendly_id_config.slug_column)
+          end
         end
+      else
+        super
       end
     end
 
