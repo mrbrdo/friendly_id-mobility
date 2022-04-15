@@ -70,15 +70,21 @@ module FriendlyId
         super
       end
     end
+    private
+
+    # TODO: take into account mobility plugins like :history and :scoped!
+    def scope_for_slug_generator
+      scope = self.class.base_class.unscoped
+      scope = scope.friendly unless scope.respond_to?(:exists_by_friendly_id?)
+      primary_key_name = self.class.primary_key
+      scope.where(self.class.base_class.arel_table[primary_key_name].not_eq(send(primary_key_name)))
+    end
 
     module FinderMethods
       include ::FriendlyId::History::FinderMethods
 
       def exists_by_friendly_id?(id)
-        # Need to unscope the INNER JOIN friendly_id_slugs, because the INNER JOIN
-        # would incorrectly filter results
-        unscope(:joins).where(friendly_id_config.query_field => id).exists? ||
-          joins(:slugs).where(slug_history_clause(id)).exists?
+        where(friendly_id_config.query_field => parse_friendly_id(id)).exists?
       end
     end
   end
