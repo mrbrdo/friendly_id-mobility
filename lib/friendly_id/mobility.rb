@@ -86,6 +86,28 @@ module FriendlyId
       def exists_by_friendly_id?(id)
         where(friendly_id_config.query_field => parse_friendly_id(id)).exists?
       end
+
+      private
+
+      def first_by_friendly_id(id)
+        fallback_locales = [::Mobility.locale]
+        begin
+          backend = model.mobility_backend_class(friendly_id_config.slug_column)
+          fallback_locales.concat(backend.fallbacks[::Mobility.locale])
+          fallback_locales.uniq!
+        rescue KeyError # backend not found
+        end
+
+        fallback_locales.each do |locale|
+          ::Mobility.with_locale(locale) do
+            find_by(friendly_id_config.query_field => parse_friendly_id(id)).tap do |result|
+              return result if result
+            end
+          end
+        end
+
+        nil
+      end
     end
   end
 end
